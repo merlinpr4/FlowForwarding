@@ -1,0 +1,84 @@
+#the following lines of code are required to execute my code in Docker containers and launch terminals
+#I ran Docker on my windows 10 laptop with the help of Xlaunch
+
+#Create a 4 networks
+docker network create -d bridge --subnet 172.30.0.0/16 net1
+docker network create -d bridge --subnet 172.40.0.0/16 net2
+docker network create -d bridge --subnet 172.50.0.0/16 net3
+docker network create -d bridge --subnet 172.60.0.0/16 net4
+
+#Create 7 containers on Docker
+ docker create --name controller --cap-add=ALL -ti -v 'C:/Users/merli/Documents/CN:/assigment2' java /bin/bash
+ docker create --name endpoint --cap-add=ALL -ti -v 'C:/Users/merli/Documents/CN:/assigment2' java/bin/bash
+ docker create --name endpointB --cap-add=ALL -ti -v 'C:/Users/merli/Documents/CN:/assigment2' java/bin/bash
+ docker create --name router --cap-add=ALL -ti -v 'C:/Users/merli/Documents/CN:/assigment2' java /bin/bash
+ docker create --name routerB --cap-add=ALL -ti -v 'C:/Users/merli/Documents/CN:/assigment2' java/bin/bash
+ docker create --name routerC --cap-add=ALL -ti -v 'C:/Users/merli/Documents/CN:/assigment2' java /bin/bash
+ docker create --name routerD --cap-add=ALL -ti -v 'C:/Users/merli/Documents/CN:/assigment2' java /bin/bash
+
+
+#Note replace 'C:/Users/merli/Documents/CN' with where the you have the folder with the source code to mount a directory on host machine under /assigment2
+
+#connect the docker containers to the network note the order connected is very important look at figure of protocol diagram if confused . The controller is already connected to the containers on the default network bridge
+ docker network connect net1 endpoint
+ docker network connect net1 router
+ docker network connect net2 router
+ docker network connect net2 routerB
+ docker network connect net2 routerD
+ docker network connect net3 routerB
+ docker network connect net3 routerC
+ docker network connect net4 routerC
+ docker network connect net4 endpointB
+
+####Start the containers in this order on the first try to ensure ip addresses are matched correctly for the controller
+##controller uses the default network bridge and so the ip addresses are hardcoded
+ensure you start up containers in the following order on your first try 
+1.Controller  ip ondefault 172.17.02 
+2.EndpointB   ip ondefault 172.17.03
+3.Router      ip ondefault 172.17.04 
+4.RouterB     ip ondefault 172.17.05 
+5.RouterC     ip ondefault 172.17.06
+6.Endpoint    ip ondefault 172.17.07 
+7.RouterD     ip ondefault 172.17.08 
+
+check the ip address configuration of each container with following command
+		docker inspect --format='{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' controller
+this should print out 172.17.0.2 otherwise the code wont work
+if there are issues test the ip address of each service with command 
+docker inspect --format='{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' containername
+and make sure they match the ip address listed in table below
+
+#Controller container instructions :
+docker start -i controller
+cd /assigment2
+export DISPLAY=host.docker.internal:0.0 
+wireshark 2>/dev/null &
+javac -cp .:./tcdlib.jar Controller.java
+java -cp .:./tcdlib.jar Controller
+
+#Endpoint container instructions : 
+docker start -i endpoint  #replace endpoint with container name endpointB as to start other endpoint
+cd /assigment2
+export DISPLAY=host.docker.internal:0.0 
+wireshark 2>/dev/null &
+javac -cp .:./tcdlib.jar ApplicationA.java  #compile ApplicationB in endpointB container
+javac -cp .:./tcdlib.jar Service.java
+java -cp .:./tcdlib.jar Service &      
+java -cp .:./tcdlib.jar ApplicationA       #launch ApplicationB in endpointB container
+
+#one endpoint needs to be set to recieve before setting other endpoint to send packets
+
+#Router container instructions
+docker start -i router  #replace router with container name routerB ,routerC, routerD as to start other routers
+cd /assigment2
+export DISPLAY=host.docker.internal:0.0 
+wireshark 2>/dev/null &
+javac -cp .:./tcdlib.jar Service.java
+java -cp .:./tcdlib.jar Service
+
+
+
+
+
+
+ 
